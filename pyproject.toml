@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kuro-ntp"
+version = "0.1.0"
+description = "Lightweight NTP relay and client observability dashboard"
+requires-python = ">=3.12"
+dependencies = ["bottle>=0.13,<0.14", "waitress>=3,<4", "ntplib>=0.4,<0.5", "pydantic-settings>=2.3,<3"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "webtest>=3", "ruff>=0.6", "mypy>=1.11", "bandit>=1.7", "types-waitress"]
+
+[project.scripts]
+kuro = "kuro.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+kuro = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.12"
+check_untyped_defs = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
