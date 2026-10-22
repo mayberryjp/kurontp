@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     api_port: int = Field(8000, ge=1, le=65535, validation_alias="API_PORT")
     ntp_host: str = Field("127.0.0.1", validation_alias="NTP_LISTEN_ADDRESS")
     ntp_port: int = Field(123, ge=0, le=65535, validation_alias="NTP_PORT")
-    upstreams: str = Field("time.cloudflare.com,time.google.com", validation_alias="NTP_UPSTREAMS")
+    upstreams: str = Field("time.cloudflare.com,time.google.com", validation_alias="NTP_SERVERS")
     upstream_port: int = Field(123, ge=1, le=65535, validation_alias="NTP_UPSTREAM_PORT")
     sync_interval: float = Field(64, ge=1, validation_alias="NTP_SYNC_INTERVAL")
     sync_max_age: float = Field(600, ge=1, validation_alias="NTP_SYNC_MAX_AGE")
@@ -20,7 +20,6 @@ class Settings(BaseSettings):
         validation_alias="NTP_ALLOWED_NETWORKS",
     )
     rate_limit: int = Field(20, ge=1, validation_alias="NTP_RATE_LIMIT")
-    admin_token: str = Field("", validation_alias="ADMIN_TOKEN")
     log_level: str = Field("INFO", validation_alias="LOG_LEVEL")
 
     @model_validator(mode="after")
@@ -28,7 +27,7 @@ class Settings(BaseSettings):
         import ipaddress
 
         if not self.upstream_hosts:
-            raise ValueError("NTP_UPSTREAMS must contain at least one hostname")
+            raise ValueError("NTP_SERVERS must contain at least one hostname")
         networks = [part.strip() for part in self.allowed_networks.split(",") if part.strip()]
         if not networks:
             raise ValueError("NTP_ALLOWED_NETWORKS must contain at least one CIDR")

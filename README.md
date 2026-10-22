@@ -12,11 +12,11 @@ docker compose up -d
 ```
 
 Open http://localhost:8000. Point LAN clients at the host's IP on UDP port 123.
-Configure all runtime variables in `docker-compose.yml`. For remote administration,
-set `ADMIN_TOKEN` in your environment, change the HTTP port binding as appropriate,
-and put HTTPS in front of the console. Without a token, the API is unauthenticated;
-the default Compose HTTP binding is loopback only. Do not expose an open NTP relay
-or unauthenticated admin API to the internet.
+Configure runtime variables in `docker-compose.yml`. The website and API have no
+authentication: anyone who can reach HTTP can view client data and download backups.
+The default Compose HTTP binding is loopback only. For remote administration, use
+a trusted private network or a secured reverse proxy with HTTPS. Do not expose the
+admin API or an open NTP relay directly to the internet.
 
 The container runs as UID 10001 with no capabilities: host UDP 123 maps to internal
 UDP 10123. Stop any existing time server using host port 123 before starting Kuro.
@@ -48,7 +48,7 @@ frontend from Python. Run `npm run build` before packaging a wheel.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `NTP_UPSTREAMS` | `time.cloudflare.com,time.google.com` | Comma-separated hostnames or IPs, including unbracketed IPv6 |
+| `NTP_SERVERS` | `time.cloudflare.com,time.google.com` | Comma-separated hostnames or IPs, including unbracketed IPv6 |
 | `NTP_UPSTREAM_PORT` | `123` | Common upstream destination port |
 | `NTP_SYNC_INTERVAL` | `64` | Seconds between polling rounds |
 | `NTP_SYNC_MAX_AGE` | `600` | Seconds before a successful sample expires |
@@ -60,7 +60,6 @@ frontend from Python. Run `npm run build` before packaging a wheel.
 | `DATABASE_PATH` | `data/kuro.sqlite3` | SQLite file; `/data/kuro.sqlite3` in Docker |
 | `API_LISTEN_ADDRESS` | `127.0.0.1` | HTTP bind address; `0.0.0.0` in Docker |
 | `API_PORT` | `8000` | HTTP port |
-| `ADMIN_TOKEN` | Empty | Optional bearer token protecting `/api/*` except `/api/session` |
 | `LOG_LEVEL` | `INFO` | Python log level |
 
 Configuration is read at startup. Restart after changing the environment. IPv4 is
@@ -102,22 +101,21 @@ is required; host networking needs the service configured to listen on UDP 123.
 
 ## REST API
 
-When configured, send `Authorization: Bearer <ADMIN_TOKEN>`. All API responses use
-JSON except the SQLite backup. Errors use `status`, `code`, and `error`. CORS allows
-all origins as in the reference standards; authentication is explicit, not cookie-based.
+All endpoints are accessible without credentials. All API responses use JSON except
+the SQLite backup. Errors use `status`, `code`, and `error`. CORS allows all origins
+as in the reference standards. Restrict HTTP access at the network or reverse proxy.
 
 | Endpoint | Result |
 | --- | --- |
 | `GET /health` | Process liveness (public) |
 | `GET /ready` | 200 only with database, NTP listener, healthy tracking, and fresh sync; otherwise 503 (public) |
-| `GET /api/session` | Whether a token is required (public) |
 | `GET /api/status` | Sync, upstreams, configuration, counters, totals |
 | `GET /api/clients` | All clients by default: `items`, `total` |
 | `GET /api/clients?search=192.168&limit=25&offset=0` | IP substring search and explicit opt-in pagination |
 | `GET /api/backup` | Streaming consistent SQLite snapshot of committed data |
 
-The UI token is held only in memory and is cleared on reload/lock. The console
-supports client JSON export and live refresh every five seconds. Admin actions
+The console loads directly and supports client JSON export and live refresh every
+five seconds. Admin actions
 are read-only; environment settings cannot be changed through the website.
 
 ### Backup and Restore
@@ -144,9 +142,9 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Browser checks start an isolated service on HTTP 18000 / UDP 10124 and use a
-non-secret test token. They cover desktop/mobile, real UDP traffic, login failures,
-client search, downloads, and network error recovery. Screenshots are written to
+Browser checks start an isolated service on HTTP 18000 / UDP 10124. They cover
+desktop/mobile, direct dashboard access, real UDP traffic, client search, downloads,
+and network error recovery. Screenshots are written to
 `test-results/`. A single workflow validates and builds the image; main-branch
 publishing requires `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets.
 

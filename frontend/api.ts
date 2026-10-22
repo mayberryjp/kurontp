@@ -31,14 +31,10 @@ export class APIError extends Error {
   constructor(message: string, public status: number) { super(message); }
 }
 
-let token = '';
-export function setToken(value: string): void { token = value; }
-
 async function transport(path: string): Promise<Response> {
   let result: Response;
   try {
     result = await fetch(`/api/${path}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
       signal: AbortSignal.timeout(15000), cache: 'no-store',
     });
   } catch {
@@ -54,7 +50,6 @@ async function transport(path: string): Promise<Response> {
 async function json<T>(path: string): Promise<T> { return (await transport(path)).json() as Promise<T>; }
 
 export const api = {
-  session: () => json<{ authentication_required: boolean }>('session'),
   status: () => json<Status>('status'),
   clients: (search = '', offset = 0, all = false) => {
     const params = new URLSearchParams({ search });

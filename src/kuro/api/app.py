@@ -1,6 +1,5 @@
 import json
 import logging
-import secrets
 import sqlite3
 import tempfile
 import time
@@ -20,14 +19,8 @@ def create_app(settings: Settings, repository: Repository, service: NTPService) 
     app = Bottle()
 
     @app.hook("before_request")
-    def authorize():
+    def start_request():
         request.environ["kuro.started"] = time.monotonic()
-        if (request.method != "OPTIONS" and request.path.startswith("/api/")
-                and request.path != "/api/session" and settings.admin_token):
-            expected = f"Bearer {settings.admin_token}".encode()
-            actual = request.headers.get("Authorization", "").encode()
-            if not secrets.compare_digest(expected, actual):
-                raise HTTPError(401, "A valid admin bearer token is required")
 
     @app.hook("after_request")
     def headers_and_log():
@@ -48,7 +41,7 @@ def create_app(settings: Settings, repository: Repository, service: NTPService) 
 
     def error_handler(error):
         response.content_type = "application/json"
-        codes = {400: "validation_error", 401: "unauthenticated", 404: "not_found",
+        codes = {400: "validation_error", 404: "not_found",
                  405: "method_not_allowed", 500: "internal_error", 503: "not_ready"}
         message = "Internal server error" if error.status_code == 500 else str(error.body)
         if error.status_code == 500:
@@ -76,10 +69,6 @@ def create_app(settings: Settings, repository: Repository, service: NTPService) 
         if not service.synchronized() or not service.socket or service.writer_failed:
             raise HTTPError(503, "NTP listener, upstream synchronization, or tracking not ready")
         return {"status": "ok"}
-
-    @app.get("/api/session")
-    def session():
-        return {"status": "ok", "authentication_required": bool(settings.admin_token)}
 
     @app.get("/api/status")
     def status():

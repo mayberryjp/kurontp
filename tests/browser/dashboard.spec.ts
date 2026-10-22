@@ -2,20 +2,14 @@ import { test, expect } from '@playwright/test';
 import { createSocket } from 'node:dgram';
 import { readFile } from 'node:fs/promises';
 
-test('console authentication, real clients, downloads, and recovery', async ({ page }, testInfo) => {
+test('console loads directly, tracks real clients, downloads, and recovers', async ({ page }, testInfo) => {
   const failures: string[] = [];
   page.on('pageerror', error => failures.push(error.message));
   await page.goto('/');
   await expect(page.locator('html')).toHaveCSS('color-scheme', 'dark');
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(20, 23, 24)');
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCSS('background-color', 'rgb(27, 31, 32)');
-  await page.getByLabel('Admin token').fill('wrong-token');
-  await page.getByRole('button', { name: 'Connect', exact: true }).click();
-  await expect(page.locator('#login-error')).toContainText('valid admin');
-  await page.getByLabel('Admin token').fill('e2e-test-token');
-  await page.getByRole('button', { name: 'Connect', exact: true }).click();
-  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Lock console' })).toHaveCount(0);
   await expect(page.locator('#sync-label')).toHaveText('Not synchronized');
 
   await new Promise<void>((resolve, reject) => {
@@ -65,7 +59,5 @@ test('console authentication, real clients, downloads, and recovery', async ({ p
   });
   expect(pixels).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('dashboard.png'), fullPage: true });
-  await page.getByRole('button', { name: 'Lock console' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
   expect(failures).toEqual([]);
 });

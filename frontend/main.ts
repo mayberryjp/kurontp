@@ -1,13 +1,12 @@
 import { createIcons, Activity, ArrowDownToLine, ArrowLeft, ArrowRight, Clock3,
-  Database, LogOut, Network, RefreshCw, Search, Server, ShieldCheck, X } from 'lucide';
-import { api, APIError, setToken, type ClientList, type Status } from './api';
+  Database, Network, RefreshCw, Search, Server, ShieldCheck, X } from 'lucide';
+import { api, type ClientList, type Status } from './api';
 import './style.css';
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <header class="header"><div class="brand"><span class="brand-mark"><i data-lucide="network"></i></span>
     <span>Kuro<span class="brand-sub">NTP CONSOLE</span></span></div>
-    <div class="header-right"><span class="local-time" id="clock"></span><span class="local-label">LOCAL TIME</span>
-      <button id="logout" class="icon-button" title="Lock console" aria-label="Lock console" hidden><i data-lucide="log-out"></i></button></div></header>
+    <div class="header-right"><span class="local-time" id="clock"></span><span class="local-label">LOCAL TIME</span></div></header>
   <main><div class="page-title"><div><div class="eyebrow">TIME INFRASTRUCTURE</div><h1>Server overview</h1></div>
     <div class="page-actions"><label class="auto-refresh"><input id="auto" type="checkbox" checked />Live</label>
       <button class="icon-button" id="refresh" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
@@ -36,13 +35,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <details class="configuration"><summary><i data-lucide="shield-check"></i>Runtime configuration</summary><dl id="configuration"></dl></details>
     <footer><span><span class="tiny-dot"></span> Kuro / SQLite</span><span id="last-updated">Not yet updated</span></footer>
   </main>
-  <dialog id="login"><form id="login-form"><span class="dialog-mark"><i data-lucide="shield-check"></i></span><h2>Unlock console</h2>
-    <label for="token">Admin token</label><input id="token" type="password" autocomplete="current-password" required />
-    <p id="login-error" role="alert"></p><button class="button primary" type="submit">Connect</button></form></dialog>
   <div id="toast" role="status" hidden></div>`;
 
 const icons = { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, Clock3, Database,
-  LogOut, Network, RefreshCw, Search, Server, ShieldCheck, X };
+  Network, RefreshCw, Search, Server, ShieldCheck, X };
 function iconize(): void { createIcons({ icons }); }
 iconize();
 
@@ -64,14 +60,6 @@ let busy = false;
 let searchTimer: ReturnType<typeof setTimeout>;
 let prior: { requests: number; at: number } | undefined;
 const history: number[] = [];
-const login = element<HTMLDialogElement>('login');
-let authRequired = false;
-
-function showLogin(): void {
-  if (!login.open) login.showModal();
-  element<HTMLInputElement>('token').focus();
-}
-login.addEventListener('cancel', event => event.preventDefault());
 
 function drawChart(): void {
   const canvas = element<HTMLCanvasElement>('traffic');
@@ -161,7 +149,7 @@ function renderClients(result: ClientList): void {
 }
 
 async function refresh(): Promise<void> {
-  if (busy || login.open) return;
+  if (busy) return;
   busy = true;
   element('refresh').classList.add('refreshing');
   const query = element<HTMLInputElement>('search').value;
@@ -172,8 +160,8 @@ async function refresh(): Promise<void> {
     element('error').hidden = true;
     text('last-updated', `Updated ${new Date().toLocaleTimeString()}`);
   } catch (error) {
-    if (error instanceof APIError && error.status === 401) showLogin();
-    else { text('error', `${error instanceof Error ? error.message : 'Unable to load data'} Displayed values may be stale.`); element('error').hidden = false; }
+    text('error', `${error instanceof Error ? error.message : 'Unable to load data'} Displayed values may be stale.`);
+    element('error').hidden = false;
   } finally {
     busy = false;
     element('refresh').classList.remove('refreshing');
@@ -188,22 +176,6 @@ element('search').addEventListener('input', () => {
 });
 element('previous').addEventListener('click', () => { offset = Math.max(0, offset - 25); void refresh(); });
 element('next').addEventListener('click', () => { offset += 25; void refresh(); });
-element('login-form').addEventListener('submit', event => {
-  event.preventDefault();
-  const button = element<HTMLButtonElement>('login-form').querySelector('button')!;
-  button.disabled = true;
-  setToken(element<HTMLInputElement>('token').value);
-  void api.status().then(() => {
-    element<HTMLInputElement>('token').value = ''; text('login-error', '');
-    login.close(); element('logout').hidden = false; void refresh();
-  }).catch(error => { setToken(''); text('login-error', error.message); })
-    .finally(() => { button.disabled = false; });
-});
-element('logout').addEventListener('click', () => {
-  setToken(''); element('logout').hidden = true;
-  element('clients').innerHTML = '<tr><td colspan="5" class="empty">Console locked</td></tr>';
-  showLogin();
-});
 
 function download(blob: Blob, name: string): void {
   const url = URL.createObjectURL(blob);
@@ -217,8 +189,7 @@ function toast(message: string): void {
 async function action(id: string, work: () => Promise<void>): Promise<void> {
   const button = element<HTMLButtonElement>(id); button.disabled = true;
   try { await work(); } catch (error) {
-    if (error instanceof APIError && error.status === 401) showLogin();
-    else toast(error instanceof Error ? error.message : 'Request failed');
+    toast(error instanceof Error ? error.message : 'Request failed');
   } finally { button.disabled = false; }
 }
 element('backup').addEventListener('click', () => void action('backup', async () => {
@@ -234,7 +205,4 @@ function clock(): void {
 }
 clock(); setInterval(clock, 1000);
 setInterval(() => { if (element<HTMLInputElement>('auto').checked && !document.hidden) void refresh(); }, 5000);
-void api.session().then(session => {
-  authRequired = session.authentication_required;
-  if (authRequired) showLogin(); else void refresh();
-}).catch(() => void refresh());
+void refresh();

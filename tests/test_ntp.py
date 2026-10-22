@@ -2,10 +2,20 @@ import socket
 import time
 
 import ntplib
+import pytest
+from pydantic import ValidationError
 
 from kuro.config import Settings
 from kuro.db import Repository
 from kuro.ntp import ClockSample, NTPService, query_upstream
+
+
+def test_servers_environment_variable(monkeypatch):
+    monkeypatch.setenv("NTP_SERVERS", "time.example.com, 192.0.2.1,time.example.com")
+    assert Settings().upstream_hosts == ["time.example.com", "192.0.2.1"]
+    monkeypatch.setenv("NTP_SERVERS", " , ")
+    with pytest.raises(ValidationError, match="NTP_SERVERS must contain at least one hostname"):
+        Settings()
 
 
 def service(tmp_path, **overrides):

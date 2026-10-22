@@ -16,8 +16,6 @@ def main() -> None:
     settings = Settings()
     logging.basicConfig(level=settings.log_level,
                         format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    if not settings.admin_token:
-        log.warning("ADMIN_TOKEN unset: admin API is unauthenticated; use only on trusted networks")
     repository = Repository(settings.database_path)
     service = NTPService(settings, repository)
     server = create_server(create_app(settings, repository, service),
