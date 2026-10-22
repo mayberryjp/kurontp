@@ -11,7 +11,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DATABASE_PATH=/data/kuro.sqlite3 \
     API_LISTEN_ADDRESS=0.0.0.0 \
     NTP_LISTEN_ADDRESS=0.0.0.0 \
-    NTP_PORT=10123
+    NTP_PORT=123
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
@@ -20,5 +20,5 @@ RUN pip install --no-cache-dir . \
     && useradd --uid 10001 --create-home kuro \
     && mkdir -p /data && chown kuro:kuro /data
 USER kuro
-EXPOSE 8000/tcp 10123/udp
+EXPOSE 8000/tcp 123/udp
 CMD ["python", "-m", "kuro"]

@@ -5,13 +5,13 @@ services:
     init: true
     ports:
       - "127.0.0.1:8000:8000/tcp"
-      - "123:10123/udp"
+      - "123:123/udp"
     environment:
       DATABASE_PATH: /data/kuro.sqlite3
       API_LISTEN_ADDRESS: "0.0.0.0"
       API_PORT: "8000"
       NTP_LISTEN_ADDRESS: "0.0.0.0"
-      NTP_PORT: "10123"
+      NTP_PORT: "123"
       NTP_SERVERS: "time.cloudflare.com,time.google.com"
       NTP_UPSTREAM_PORT: "123"
       NTP_SYNC_INTERVAL: "64"
@@ -25,6 +25,8 @@ services:
       - kuro-data:/data
     cap_drop:
       - ALL
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
     security_opt:
       - no-new-privileges:true
 

@@ -51,10 +51,8 @@ async function json<T>(path: string): Promise<T> { return (await transport(path)
 
 export const api = {
   status: () => json<Status>('status'),
-  clients: (search = '', offset = 0, all = false) => {
-    const params = new URLSearchParams({ search });
-    if (!all) { params.set('limit', '25'); params.set('offset', String(offset)); }
+  clients: (search = '', offset = 0) => {
+    const params = new URLSearchParams({ search, limit: '25', offset: String(offset) });
     return json<ClientList>(`clients?${params}`);
   },
-  backup: async () => (await transport('backup')).blob(),
 };

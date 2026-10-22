@@ -1,8 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createSocket } from 'node:dgram';
-import { readFile } from 'node:fs/promises';
 
-test('console loads directly, tracks real clients, downloads, and recovers', async ({ page }, testInfo) => {
+test('simple console tracks real clients and recovers', async ({ page }, testInfo) => {
   const failures: string[] = [];
   page.on('pageerror', error => failures.push(error.message));
   await page.goto('/');
@@ -10,6 +9,9 @@ test('console loads directly, tracks real clients, downloads, and recovers', asy
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(20, 23, 24)');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Lock console' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Back up SQLite' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Export clients as JSON' })).toHaveCount(0);
+  await expect(page.getByText('Runtime configuration', { exact: true })).toHaveCount(0);
   await expect(page.locator('#sync-label')).toHaveText('Not synchronized');
 
   await new Promise<void>((resolve, reject) => {
@@ -29,22 +31,13 @@ test('console loads directly, tracks real clients, downloads, and recovers', asy
     await page.getByRole('button', { name: 'Refresh', exact: true }).click();
     return page.locator('#clients').textContent();
   }).toContain('127.0.0.1');
-  await expect(page.locator('#clients tr').first()).toContainText('v4');
+  await expect(page.locator('#clients tr').first().locator('td')).toHaveCount(4);
+  await expect(page.getByRole('columnheader', { name: 'First seen' })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Last seen' })).toBeVisible();
   await page.getByRole('searchbox').fill('no-match');
   await expect(page.locator('#clients')).toContainText('No matching clients');
   await page.getByRole('searchbox').fill('127.0.0.1');
   await expect(page.locator('#clients')).toContainText('127.0.0.1');
-
-  const exportEvent = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export clients as JSON' }).click();
-  const exported = await exportEvent;
-  const payload = JSON.parse(await readFile((await exported.path())!, 'utf8'));
-  expect(payload.items[0].ip).toBe('127.0.0.1');
-  const backupEvent = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Back up SQLite' }).click();
-  const backup = await backupEvent;
-  const bytes = await readFile((await backup.path())!);
-  expect(bytes.subarray(0, 15).toString()).toBe('SQLite format 3');
 
   await page.route('**/api/status', route => route.abort());
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();

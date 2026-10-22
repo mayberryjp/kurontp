@@ -1,5 +1,5 @@
-import { createIcons, Activity, ArrowDownToLine, ArrowLeft, ArrowRight, Clock3,
-  Database, Network, RefreshCw, Search, Server, ShieldCheck, X } from 'lucide';
+import { createIcons, Activity, ArrowLeft, ArrowRight, Clock3,
+  Network, RefreshCw, Search, Server } from 'lucide';
 import { api, type ClientList, type Status } from './api';
 import './style.css';
 
@@ -7,38 +7,32 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <header class="header"><div class="brand"><span class="brand-mark"><i data-lucide="network"></i></span>
     <span>Kuro<span class="brand-sub">NTP CONSOLE</span></span></div>
     <div class="header-right"><span class="local-time" id="clock"></span><span class="local-label">LOCAL TIME</span></div></header>
-  <main><div class="page-title"><div><div class="eyebrow">TIME INFRASTRUCTURE</div><h1>Server overview</h1></div>
-    <div class="page-actions"><label class="auto-refresh"><input id="auto" type="checkbox" checked />Live</label>
-      <button class="icon-button" id="refresh" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
-      <button id="backup" class="button"><i data-lucide="database"></i>Back up SQLite</button></div></div>
+  <main><div class="page-title"><h1>Overview</h1>
+    <button class="icon-button" id="refresh" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button></div>
     <div id="error" class="error-banner" role="alert" hidden></div>
     <section id="sync-strip" class="sync-strip pending" aria-live="polite"><span class="status-dot"></span>
-      <strong id="sync-label">Connecting</strong><span id="sync-detail">Waiting for server status</span><span class="protocol">NTP v3 / v4</span></section>
+      <div class="sync-copy"><strong id="sync-label">Connecting</strong><span id="sync-detail">Waiting for server status</span></div><span class="protocol" id="listener">UDP 123</span></section>
     <section class="stats" aria-label="Server metrics">
-      <article><span class="stat-label">TOTAL REQUESTS<i data-lucide="activity"></i></span><strong id="total-requests">--</strong><span class="stat-note">Persisted requests</span></article>
-      <article><span class="stat-label">KNOWN CLIENTS<i data-lucide="network"></i></span><strong id="total-clients">--</strong><span class="stat-note">Unique source IPs</span></article>
-      <article><span class="stat-label">CLOCK OFFSET<i data-lucide="clock-3"></i></span><strong id="offset">--<small>ms</small></strong><span id="offset-note" class="stat-note">Awaiting synchronization</span></article>
-      <article><span class="stat-label">SERVER STRATUM<i data-lucide="server"></i></span><strong id="stratum">--</strong><span id="stratum-note" class="stat-note">Not synchronized</span></article>
+      <article><span class="stat-label">Clients<i data-lucide="network"></i></span><strong id="total-clients">--</strong><span class="stat-note">Unique source IPs</span></article>
+      <article><span class="stat-label">Requests<i data-lucide="activity"></i></span><strong id="total-requests">--</strong><span class="stat-note">Total received</span></article>
+      <article><span class="stat-label">Clock offset<i data-lucide="clock-3"></i></span><strong id="offset">--<small>ms</small></strong><span id="offset-note" class="stat-note">Awaiting synchronization</span></article>
+      <article><span class="stat-label">Stratum<i data-lucide="server"></i></span><strong id="stratum">--</strong><span id="stratum-note" class="stat-note">Not synchronized</span></article>
     </section>
-    <section class="network-section"><div class="upstreams"><div class="section-heading"><h2>Upstream sources</h2><span class="tag">ENV MANAGED</span></div>
-      <div id="upstreams" class="upstream-list"><p class="empty">Loading upstreams...</p></div></div>
-      <div class="traffic"><div class="section-heading"><h2>Request activity</h2><span id="rate" class="mono">-- req/s</span></div>
-        <canvas id="traffic" aria-label="Recent request rate" role="img"></canvas><div class="chart-footer"><span id="chart-label">Waiting for samples</span><span>Now</span></div></div></section>
     <section class="clients-section"><div class="section-heading clients-heading"><div class="heading-inline"><h2>Clients</h2><span id="client-count" class="count">0</span></div>
-      <div class="client-actions"><div class="search"><i data-lucide="search"></i><input id="search" type="search" placeholder="Search source IP" aria-label="Search source IP" /></div>
-        <button id="export" class="icon-button" title="Export clients as JSON" aria-label="Export clients as JSON"><i data-lucide="arrow-down-to-line"></i></button></div></div>
-      <div class="table-scroll"><table><thead><tr><th>Source IP</th><th>Requests</th><th>First seen</th><th>Last seen</th><th>Protocol</th></tr></thead>
-        <tbody id="clients"><tr><td colspan="5" class="empty">Loading clients...</td></tr></tbody></table></div>
+      <div class="search"><i data-lucide="search"></i><input id="search" type="search" placeholder="Search source IP" aria-label="Search source IP" /></div></div>
+      <div class="table-scroll"><table><thead><tr><th>Source IP</th><th>Requests</th><th>First seen</th><th>Last seen</th></tr></thead>
+        <tbody id="clients"><tr><td colspan="4" class="empty">Loading clients...</td></tr></tbody></table></div>
       <div class="table-footer"><span id="page-label">--</span><div class="pagination"><button id="previous" class="icon-button" aria-label="Previous page" title="Previous page" disabled><i data-lucide="arrow-left"></i></button>
         <button id="next" class="icon-button" aria-label="Next page" title="Next page" disabled><i data-lucide="arrow-right"></i></button></div></div>
     </section>
-    <details class="configuration"><summary><i data-lucide="shield-check"></i>Runtime configuration</summary><dl id="configuration"></dl></details>
-    <footer><span><span class="tiny-dot"></span> Kuro / SQLite</span><span id="last-updated">Not yet updated</span></footer>
-  </main>
-  <div id="toast" role="status" hidden></div>`;
+    <section class="network-section"><div class="upstreams"><div class="section-heading"><h2>Time servers</h2></div>
+      <div id="upstreams" class="upstream-list"><p class="empty">Loading time servers...</p></div></div>
+      <div class="traffic"><div class="section-heading"><h2>Activity</h2><span id="rate" class="mono">-- req/s</span></div>
+        <canvas id="traffic" aria-label="Recent request rate" role="img"></canvas><div class="chart-footer"><span id="chart-label">Waiting for samples</span><span>Now</span></div></div></section>
+    <footer><span><span class="tiny-dot"></span> NTP v3 / v4</span><span id="last-updated">Not yet updated</span></footer>
+  </main>`;
 
-const icons = { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, Clock3, Database,
-  Network, RefreshCw, Search, Server, ShieldCheck, X };
+const icons = { Activity, ArrowLeft, ArrowRight, Clock3, Network, RefreshCw, Search, Server };
 function iconize(): void { createIcons({ icons }); }
 iconize();
 
@@ -101,6 +95,7 @@ function renderStatus(status: Status): void {
     : !status.tracking_healthy ? 'Tracking degraded' : 'Not synchronized');
   text('sync-detail', healthy ? `Following ${status.selected_upstream} / UDP ${status.port}`
     : status.synchronized ? 'Check server health' : 'Waiting for a valid upstream time sample');
+  text('listener', `UDP ${status.port}`);
   text('total-requests', number.format(status.totals.requests));
   text('total-clients', number.format(status.totals.clients));
   element('offset').innerHTML = `${fixed(status.offset_ms)}<small>ms</small>`;
@@ -111,17 +106,6 @@ function renderStatus(status: Status): void {
     <div class="upstream"><span class="source-icon"><i data-lucide="server"></i></span><div class="source-name"><strong>${escape(source.host)}</strong>
     <span>${escape(source.address || 'No time sample')}</span></div><span class="source-delay mono">${source.delay_ms == null ? '--' : `${fixed(source.delay_ms)} ms`}</span>
     <span class="source-status ${source.host === status.selected_upstream && status.synchronized ? 'selected' : ''}">${source.host === status.selected_upstream && status.synchronized ? 'Selected' : escape(source.status)}</span></div>`).join('');
-  const config = status.configuration;
-  const entries: [string, string][] = [
-    ['NTP listener', `${config.listen_address}:${status.port}`],
-    ['Sync interval / expiry', `${config.sync_interval}s / ${config.sync_max_age}s`],
-    ['Allowed networks', config.allowed_networks], ['Per-IP reply limit', `${config.rate_limit} / second`],
-    ['Rejected / rate limited', `${status.metrics.rejected} / ${status.metrics.rate_limited}`],
-    ['Tracking queue / dropped', `${status.tracking_queue} / ${status.metrics.tracking_dropped}`],
-    ['Uptime', `${Math.floor(status.uptime_seconds / 60)} minutes`],
-  ];
-  element('configuration').innerHTML = entries.map(([key, value]) =>
-    `<div><dt>${escape(key)}</dt><dd>${escape(value)}</dd></div>`).join('');
   const now = performance.now();
   if (prior && now - prior.at >= 1000) {
     const rate = Math.max(0, (status.totals.requests - prior.requests) / ((now - prior.at) / 1000));
@@ -141,8 +125,8 @@ function renderClients(result: ClientList): void {
     <tr><td><span class="ip-mark"></span><span class="mono ip">${escape(client.ip)}</span></td>
     <td class="mono requests">${number.format(client.requests)}</td>
     <td title="${escape(client.first_seen)}">${escape(date(client.first_seen))}</td>
-    <td title="${escape(client.last_seen)}">${escape(date(client.last_seen))}</td><td><span class="version">v${client.version}</span></td></tr>`).join('')
-    : `<tr><td colspan="5" class="empty">${element<HTMLInputElement>('search').value ? 'No matching clients' : 'No clients seen yet'}</td></tr>`;
+    <td title="${escape(client.last_seen)}">${escape(date(client.last_seen))}</td></tr>`).join('')
+    : `<tr><td colspan="4" class="empty">${element<HTMLInputElement>('search').value ? 'No matching clients' : 'No clients seen yet'}</td></tr>`;
   text('page-label', result.total ? `${offset + 1}-${offset + result.items.length} of ${number.format(result.total)} clients` : '0 clients');
   element<HTMLButtonElement>('previous').disabled = offset === 0;
   element<HTMLButtonElement>('next').disabled = offset + 25 >= result.total;
@@ -177,32 +161,9 @@ element('search').addEventListener('input', () => {
 element('previous').addEventListener('click', () => { offset = Math.max(0, offset - 25); void refresh(); });
 element('next').addEventListener('click', () => { offset += 25; void refresh(); });
 
-function download(blob: Blob, name: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a'); link.href = url; link.download = name; link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-function toast(message: string): void {
-  text('toast', message); element('toast').hidden = false;
-  setTimeout(() => { element('toast').hidden = true; }, 4000);
-}
-async function action(id: string, work: () => Promise<void>): Promise<void> {
-  const button = element<HTMLButtonElement>(id); button.disabled = true;
-  try { await work(); } catch (error) {
-    toast(error instanceof Error ? error.message : 'Request failed');
-  } finally { button.disabled = false; }
-}
-element('backup').addEventListener('click', () => void action('backup', async () => {
-  download(await api.backup(), 'kuro-backup.sqlite3'); toast('SQLite backup downloaded');
-}));
-element('export').addEventListener('click', () => void action('export', async () => {
-  const clients = await api.clients(element<HTMLInputElement>('search').value, 0, true);
-  download(new Blob([JSON.stringify(clients, null, 2)], { type: 'application/json' }), 'kuro-clients.json');
-}));
-
 function clock(): void {
   text('clock', new Date().toLocaleTimeString(undefined, { hour12: false }));
 }
 clock(); setInterval(clock, 1000);
-setInterval(() => { if (element<HTMLInputElement>('auto').checked && !document.hidden) void refresh(); }, 5000);
+setInterval(() => { if (!document.hidden) void refresh(); }, 5000);
 void refresh();

@@ -18,8 +18,10 @@ The default Compose HTTP binding is loopback only. For remote administration, us
 a trusted private network or a secured reverse proxy with HTTPS. Do not expose the
 admin API or an open NTP relay directly to the internet.
 
-The container runs as UID 10001 with no capabilities: host UDP 123 maps to internal
-UDP 10123. Stop any existing time server using host port 123 before starting Kuro.
+The container runs as UID 10001 with no capabilities, listening on UDP 123 both
+inside and outside Docker. Compose sets `net.ipv4.ip_unprivileged_port_start=0`
+inside the container's network namespace so the non-root process can bind port 123.
+Stop any existing time server using host port 123 before starting Kuro.
 Host firewall rules must allow client UDP traffic and outbound upstream UDP 123.
 The named volume `kuro-data` holds the database. Do not delete it during upgrades.
 
@@ -31,7 +33,6 @@ Python 3.12+ and Node 22+ are required for development. No virtual environment i
 python -m pip install -e ".[dev]"
 npm ci
 npm run build
-$env:NTP_PORT = "10123"
 python -m kuro
 ```
 
@@ -54,7 +55,7 @@ frontend from Python. Run `npm run build` before packaging a wheel.
 | `NTP_SYNC_MAX_AGE` | `600` | Seconds before a successful sample expires |
 | `NTP_UPSTREAM_TIMEOUT` | `2` | Per-address socket timeout in seconds; OS DNS resolution has its own timeout |
 | `NTP_LISTEN_ADDRESS` | `127.0.0.1` | Local bind address; `0.0.0.0` in Docker |
-| `NTP_PORT` | `123` | UDP listen port; `10123` in Docker; `0` requests an ephemeral test port |
+| `NTP_PORT` | `123` | UDP listen port locally and in Docker; `0` requests an ephemeral test port |
 | `NTP_ALLOWED_NETWORKS` | Loopback and RFC1918 IPv4, `::1/128,fc00::/7` | Comma-separated allowed CIDRs; IPv6 link-local must be added explicitly |
 | `NTP_RATE_LIMIT` | `20` | Replies per source IP per one-second window |
 | `DATABASE_PATH` | `data/kuro.sqlite3` | SQLite file; `/data/kuro.sqlite3` in Docker |
@@ -114,13 +115,14 @@ as in the reference standards. Restrict HTTP access at the network or reverse pr
 | `GET /api/clients?search=192.168&limit=25&offset=0` | IP substring search and explicit opt-in pagination |
 | `GET /api/backup` | Streaming consistent SQLite snapshot of committed data |
 
-The console loads directly and supports client JSON export and live refresh every
-five seconds. Admin actions
-are read-only; environment settings cannot be changed through the website.
+The console loads directly with server metrics, a searchable client table, time
+server status, and an activity chart. It refreshes every five seconds. There are
+no backup, download, or configuration controls on the website; the REST API remains
+available for integrations.
 
 ### Backup and Restore
 
-Use **Back up SQLite** or `GET /api/backup`. SQLite's online backup API includes
+Use `GET /api/backup`. SQLite's online backup API includes
 committed WAL data safely; do not copy only the live database file. A snapshot
 excludes requests still in the tracking queue. Protect backups: they contain client IPs.
 
@@ -147,7 +149,7 @@ clean wheel and verifies that its HTML and referenced CSS/JavaScript assets are
 included and served successfully from the installed package.
 
 Browser checks start an isolated service on HTTP 18000 / UDP 10124. They cover
-desktop/mobile, direct dashboard access, real UDP traffic, client search, downloads,
+desktop/mobile, direct dashboard access, real UDP traffic, client search,
 and network error recovery. Screenshots are written to
 `test-results/`. A single workflow validates and builds the image; main-branch
 publishing requires `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repository secrets.
