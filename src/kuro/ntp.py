@@ -17,6 +17,7 @@ log = logging.getLogger(__name__)
 
 
 def query_upstream(host: str, port: int, timeout: float):
+    log.info("upstream_query host=%s port=%s", host, port)
     addresses = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)
     last_error: Exception = OSError("No upstream addresses")
     for family, kind, protocol, _, address in addresses:
@@ -30,6 +31,8 @@ def query_upstream(host: str, port: int, timeout: float):
                                           tx_timestamp=ntplib.system_to_ntp_time(sent))
                 payload = packet.to_data()
                 connection.send(payload)
+                log.info("upstream_request host=%s address=%s port=%s bytes=%s",
+                         host, address[0], port, len(payload))
                 data = connection.recv(512)
                 received = time.time()
                 elapsed = time.monotonic() - started
@@ -44,8 +47,14 @@ def query_upstream(host: str, port: int, timeout: float):
                         or not math.isfinite(stats.offset) or not -0.001 <= stats.delay <= 5
                         or not 0 <= stats.root_delay <= 10 or stats.root_dispersion > 10):
                     raise ValueError("Invalid or unsynchronized upstream reply")
+                log.info("upstream_response host=%s address=%s port=%s stratum=%s "
+                         "offset_ms=%.3f delay_ms=%.3f bytes=%s",
+                         host, address[0], port, stats.stratum,
+                         stats.offset * 1000, stats.delay * 1000, len(data))
                 return stats, address[0]
         except (OSError, ntplib.NTPException, ValueError) as error:
+            log.warning("upstream_query_failed host=%s address=%s port=%s error=%s",
+                        host, address[0], port, error)
             last_error = error
     raise last_error
 
@@ -134,7 +143,15 @@ class NTPService:
                 log.warning("upstream_unavailable host=%s", host)
                 upstreams.append({"host": host, "status": "unreachable"})
         if candidates:
-            self.sample = min(candidates, key=lambda candidate: candidate.delay)
+            selected = min(candidates, key=lambda candidate: candidate.delay)
+            previous = self.sample
+            self.sample = selected
+            if previous is None or (previous.host, previous.address) != (
+                    selected.host, selected.address):
+                log.info("upstream_selected host=%s address=%s previous_host=%s "
+                         "stratum=%s offset_ms=%.3f delay_ms=%.3f",
+                         selected.host, selected.address, previous.host if previous else None,
+                         selected.stratum, selected.offset * 1000, selected.delay * 1000)
         self.upstreams = upstreams
 
     def sync_loop(self) -> None:
@@ -143,12 +160,19 @@ class NTPService:
             self.stop_event.wait(self.settings.sync_interval)
 
     def response(self, data: bytes, ip: str, received: float) -> bytes | None:
-        if len(data) != 48 or not any(ipaddress.ip_address(ip) in net for net in self.networks):
+        if len(data) != 48:
+            log.info("ntp_rejected ip=%s reason=invalid_length bytes=%s", ip, len(data))
+            self.metrics["rejected"] += 1
+            return None
+        if not any(ipaddress.ip_address(ip) in net for net in self.networks):
+            log.info("ntp_rejected ip=%s reason=access_denied", ip)
             self.metrics["rejected"] += 1
             return None
         packet = ntplib.NTPPacket()
         packet.from_data(data)
         if packet.mode != 3 or packet.version not in (3, 4) or packet.tx_timestamp == 0:
+            log.info("ntp_rejected ip=%s reason=invalid_packet mode=%s version=%s",
+                     ip, packet.mode, packet.version)
             self.metrics["rejected"] += 1
             return None
         try:
@@ -162,6 +186,7 @@ class NTPService:
         if len(self.rates) > 4096:
             self.rates.popitem(last=False)
         if count > self.settings.rate_limit:
+            log.info("ntp_rejected ip=%s reason=rate_limited", ip)
             self.metrics["rate_limited"] += 1
             return None
         reply = ntplib.NTPPacket(version=packet.version, mode=4)
@@ -191,10 +216,14 @@ class NTPService:
             try:
                 data, address = connection.recvfrom(1024)
                 received = self.now()
+                log.info("ntp_request ip=%s port=%s bytes=%s", address[0], address[1], len(data))
                 payload = self.response(data, address[0], received)
                 if payload:
                     connection.sendto(payload, address)
                     self.metrics["replies"] += 1
+                    log.info("ntp_response ip=%s port=%s version=%s stratum=%s leap=%s bytes=%s",
+                             address[0], address[1], (payload[0] >> 3) & 7,
+                             payload[1], payload[0] >> 6, len(payload))
             except TimeoutError:
                 continue
             except (OSError, ntplib.NTPException):

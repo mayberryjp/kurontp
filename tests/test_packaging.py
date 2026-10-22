@@ -35,6 +35,7 @@ def test_built_wheel_serves_frontend_assets(tmp_path):
         parser.feed(wheel.read("kuro/static/index.html").decode())
         assert any(asset.endswith(".css") for asset in parser.assets)
         assert any(asset.endswith(".js") for asset in parser.assets)
+        assert any(asset.endswith(".svg") for asset in parser.assets)
         for asset in parser.assets:
             assert wheel.read(f"kuro/static{asset}"), f"Missing packaged asset: {asset}"
         wheel.extractall(installed)
@@ -53,7 +54,7 @@ assert app.get('/').content_type == 'text/html'
 for asset in sys.argv[3:]:
     result = app.get(asset)
     assert result.body
-    assert result.content_type in ('text/css', 'text/javascript', 'application/javascript')
+    assert result.content_type in ('text/css', 'text/javascript', 'application/javascript', 'image/svg+xml')
 repository.close()
 """
     subprocess.run(

@@ -76,7 +76,8 @@ def test_unsynced_synced_and_stale_replies(tmp_path):
     server.repository.close()
 
 
-def test_acl_malformed_rate_limits_and_tracking(tmp_path):
+def test_acl_malformed_rate_limits_and_tracking(tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="kuro.ntp")
     server = service(tmp_path, rate_limit=1)
     packet = request_packet()
     assert server.response(b"bad", "127.0.0.1", time.time()) is None
@@ -87,11 +88,14 @@ def test_acl_malformed_rate_limits_and_tracking(tmp_path):
     server.flush()
     assert server.repository.summary()["requests"] == 2
     assert server.metrics["rate_limited"] == 1
+    for reason in ("invalid_length", "access_denied", "invalid_packet", "rate_limited"):
+        assert f"reason={reason}" in caplog.text
     server.close()
     server.repository.close()
 
 
-def test_real_udp_exchange_and_upstream_client(tmp_path, monkeypatch):
+def test_real_udp_exchange_and_upstream_client(tmp_path, monkeypatch, caplog):
+    caplog.set_level(logging.INFO, logger="kuro.ntp")
     server = service(tmp_path)
     server.sample = sample()
     monkeypatch.setattr(server, "sync_loop", lambda: None)
@@ -109,10 +113,19 @@ def test_real_udp_exchange_and_upstream_client(tmp_path, monkeypatch):
     finally:
         server.close()
     assert server.repository.summary()["requests"] == 2
+    messages = [record.getMessage() for record in caplog.records if record.levelno == logging.INFO]
+    assert sum(message.startswith("ntp_request ") for message in messages) == 2
+    assert sum(message.startswith("ntp_response ") for message in messages) == 2
+    assert any(message.startswith("upstream_query host=127.0.0.1 ") for message in messages)
+    assert any(message.startswith("upstream_request host=127.0.0.1 ") for message in messages)
+    assert any(message.startswith("upstream_response host=127.0.0.1 ")
+               and "stratum=3" in message and "offset_ms=" in message
+               and "delay_ms=" in message for message in messages)
     server.repository.close()
 
 
-def test_upstream_failover_and_holdover(tmp_path, monkeypatch):
+def test_upstream_failover_and_holdover(tmp_path, monkeypatch, caplog):
+    caplog.set_level(logging.INFO, logger="kuro.ntp")
     server = service(tmp_path, upstreams="bad,good")
     stats = ntplib.NTPStats()
     stats.stratum = 2
@@ -131,6 +144,13 @@ def test_upstream_failover_and_holdover(tmp_path, monkeypatch):
     assert server.synchronized()
     assert server.sample.host == "good"
     assert server.upstreams[0]["status"] == "unreachable"
+    assert "upstream_selected host=good address=127.0.0.1 previous_host=None" in caplog.text
+    caplog.clear()
+    server.sync_once()
+    assert "upstream_selected" not in caplog.text
+    server.sample = sample()
+    server.sync_once()
+    assert "upstream_selected host=good address=127.0.0.1 previous_host=test" in caplog.text
     monkeypatch.setattr("kuro.ntp.query_upstream", lambda *args: (_ for _ in ()).throw(OSError()))
     server.sync_once()
     assert server.synchronized()
