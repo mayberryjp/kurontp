@@ -60,7 +60,7 @@ frontend from Python. Run `npm run build` before packaging a wheel.
 | `DATABASE_PATH` | `data/kuro.sqlite3` | SQLite file; `/data/kuro.sqlite3` in Docker |
 | `API_LISTEN_ADDRESS` | `127.0.0.1` | HTTP bind address; `0.0.0.0` in Docker |
 | `API_PORT` | `8000` | HTTP port |
-| `LOG_LEVEL` | `INFO` | Python log level |
+| `LOG_LEVEL` | `INFO` | Case-insensitive Python level name or non-negative integer; `0` = NOTSET, `10` = DEBUG, `20` = INFO, `30` = WARNING, `40` = ERROR, `50` = CRITICAL |
 
 Configuration is read at startup. Restart after changing the environment. IPv4 is
 the default listener; for IPv6 set an IPv6 listen address. This is one listener,
@@ -132,15 +132,19 @@ deliberately offline, not an unauthenticated upload endpoint.
 ## Checks
 
 ```sh
+npm run build
 python -m pytest
 python -m ruff check src tests
 python -m mypy src
 python -m bandit -r src -q
 npm run lint
-npm run build
 npx playwright install chromium
 npm run test:e2e
 ```
+
+Build the frontend before running Python tests. The packaging regression builds a
+clean wheel and verifies that its HTML and referenced CSS/JavaScript assets are
+included and served successfully from the installed package.
 
 Browser checks start an isolated service on HTTP 18000 / UDP 10124. They cover
 desktop/mobile, direct dashboard access, real UDP traffic, client search, downloads,

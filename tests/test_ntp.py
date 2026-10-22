@@ -1,3 +1,4 @@
+import logging
 import socket
 import time
 
@@ -8,6 +9,25 @@ from pydantic import ValidationError
 from kuro.config import Settings
 from kuro.db import Repository
 from kuro.ntp import ClockSample, NTPService, query_upstream
+
+
+@pytest.mark.parametrize(("value", "expected"), [
+    ("0", 0), ("10", 10), ("20", 20), ("50", 50),
+    ("INFO", 20), ("debug", 10), (" warning ", 30), ("WARN", 30), ("FATAL", 50),
+])
+def test_log_level_environment_variable(monkeypatch, value, expected):
+    monkeypatch.setenv("LOG_LEVEL", value)
+    settings = Settings()
+    logger = logging.Logger("test-log-level")
+    logger.setLevel(settings.log_level)
+    assert logger.level == expected
+
+
+@pytest.mark.parametrize("value", ["", "verbose", "-1", "1.5"])
+def test_invalid_log_level_environment_variable(monkeypatch, value):
+    monkeypatch.setenv("LOG_LEVEL", value)
+    with pytest.raises(ValidationError, match="LOG_LEVEL must be"):
+        Settings()
 
 
 def test_servers_environment_variable(monkeypatch):

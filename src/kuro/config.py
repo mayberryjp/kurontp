@@ -1,4 +1,6 @@
-from pydantic import Field, model_validator
+import logging
+
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,7 +22,21 @@ class Settings(BaseSettings):
         validation_alias="NTP_ALLOWED_NETWORKS",
     )
     rate_limit: int = Field(20, ge=1, validation_alias="NTP_RATE_LIMIT")
-    log_level: str = Field("INFO", validation_alias="LOG_LEVEL")
+    log_level: str | int = Field("INFO", validation_alias="LOG_LEVEL")
+
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def normalize_log_level(cls, value: object) -> str | int:
+        normalized = str(value).strip().upper()
+        if normalized in logging.getLevelNamesMapping():
+            return normalized
+        try:
+            numeric = int(normalized)
+        except ValueError:
+            numeric = -1
+        if numeric >= 0:
+            return numeric
+        raise ValueError("LOG_LEVEL must be a standard logging name or a non-negative integer")
 
     @model_validator(mode="after")
     def validate_networks(self):

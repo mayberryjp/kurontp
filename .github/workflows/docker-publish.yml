@@ -30,9 +30,9 @@ jobs:
       - run: python -m ruff check src tests
       - run: python -m mypy src
       - run: python -m bandit -r src -q
-      - run: python -m pytest
       - run: npm run lint
       - run: npm run build
+      - run: python -m pytest
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: docker/setup-buildx-action@v3

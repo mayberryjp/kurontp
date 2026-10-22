@@ -9,7 +9,7 @@ lint:
 typecheck:
 	python -m mypy src
 	npm run typecheck
-test:
+test: build
 	python -m pytest
 	npm run test:e2e
 build:

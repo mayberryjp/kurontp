@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 dependencies = ["bottle>=0.13,<0.14", "waitress>=3,<4", "ntplib>=0.4,<0.5", "pydantic-settings>=2.3,<3"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "webtest>=3", "ruff>=0.6", "mypy>=1.11", "bandit>=1.7", "types-waitress"]
+dev = ["pytest>=8", "webtest>=3", "ruff>=0.6", "mypy>=1.11", "bandit>=1.7", "types-waitress", "setuptools>=69", "wheel"]
 
 [project.scripts]
 kuro = "kuro.__main__:main"
@@ -19,7 +19,7 @@ kuro = "kuro.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-kuro = ["static/*"]
+kuro = ["static/*", "static/assets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
