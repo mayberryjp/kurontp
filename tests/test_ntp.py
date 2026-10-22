@@ -18,9 +18,13 @@ from kuro.ntp import ClockSample, NTPService, query_upstream
 def test_log_level_environment_variable(monkeypatch, value, expected):
     monkeypatch.setenv("LOG_LEVEL", value)
     settings = Settings()
-    logger = logging.Logger("test-log-level")
-    logger.setLevel(settings.log_level)
-    assert logger.level == expected
+    logger = logging.getLogger("test-log-level")
+    original_level = logger.level
+    try:
+        logger.setLevel(settings.log_level)
+        assert logger.level == expected
+    finally:
+        logger.setLevel(original_level)
 
 
 @pytest.mark.parametrize("value", ["", "verbose", "-1", "1.5"])
