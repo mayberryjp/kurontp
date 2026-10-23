@@ -6,9 +6,9 @@ import './style.css';
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <header class="header"><div class="brand"><span class="brand-mark"><i data-lucide="network"></i></span>
     <span>Kuro<span class="brand-sub">NTP CONSOLE</span></span></div>
-    <div class="header-right"><span class="local-time" id="clock"></span><span class="local-label">LOCAL TIME</span></div></header>
-  <main><div class="page-title"><h1>Overview</h1>
-    <button class="icon-button" id="refresh" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button></div>
+    <div class="header-right"><span class="local-time" id="clock"></span><span class="local-label">LOCAL TIME</span>
+      <button class="icon-button" id="refresh" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button></div></header>
+  <main>
     <div id="error" class="error-banner" role="alert" hidden></div>
     <section id="sync-strip" class="sync-strip pending" aria-live="polite"><span class="status-dot"></span>
       <div class="sync-copy"><strong id="sync-label">Connecting</strong><span id="sync-detail">Waiting for server status</span></div><span class="protocol" id="listener">UDP 123</span></section>
@@ -18,6 +18,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <article><span class="stat-label">Clock offset<i data-lucide="clock-3"></i></span><strong id="offset">--<small>ms</small></strong><span id="offset-note" class="stat-note">Awaiting synchronization</span></article>
       <article><span class="stat-label">Stratum<i data-lucide="server"></i></span><strong id="stratum">--</strong><span id="stratum-note" class="stat-note">Not synchronized</span></article>
     </section>
+    <section class="network-section"><div class="upstreams"><div class="section-heading"><h2>Time servers</h2></div>
+      <div id="upstreams" class="upstream-list"><p class="empty">Loading time servers...</p></div></div>
+      <div class="traffic"><div class="section-heading"><h2>Activity</h2><span id="rate" class="mono">-- req/s</span></div>
+        <canvas id="traffic" aria-label="Recent request rate" role="img"></canvas><div class="chart-footer"><span id="chart-label">Waiting for samples</span><span>Now</span></div></div></section>
     <section class="clients-section"><div class="section-heading clients-heading"><div class="heading-inline"><h2>Clients</h2><span id="client-count" class="count">0</span></div>
       <div class="search"><i data-lucide="search"></i><input id="search" type="search" placeholder="Search source IP" aria-label="Search source IP" /></div></div>
       <div class="table-scroll"><table><thead><tr><th>Source IP</th><th>Requests</th><th>First seen</th><th>Last seen</th></tr></thead>
@@ -25,10 +29,6 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <div class="table-footer"><span id="page-label">--</span><div class="pagination"><button id="previous" class="icon-button" aria-label="Previous page" title="Previous page" disabled><i data-lucide="arrow-left"></i></button>
         <button id="next" class="icon-button" aria-label="Next page" title="Next page" disabled><i data-lucide="arrow-right"></i></button></div></div>
     </section>
-    <section class="network-section"><div class="upstreams"><div class="section-heading"><h2>Time servers</h2></div>
-      <div id="upstreams" class="upstream-list"><p class="empty">Loading time servers...</p></div></div>
-      <div class="traffic"><div class="section-heading"><h2>Activity</h2><span id="rate" class="mono">-- req/s</span></div>
-        <canvas id="traffic" aria-label="Recent request rate" role="img"></canvas><div class="chart-footer"><span id="chart-label">Waiting for samples</span><span>Now</span></div></div></section>
     <footer><span><span class="tiny-dot"></span> NTP v3 / v4</span><span id="last-updated">Not yet updated</span></footer>
   </main>`;
 
@@ -45,6 +45,14 @@ function escape(value: string): string {
     '"': '&quot;', "'": '&#39;' })[char]!);
 }
 const number = new Intl.NumberFormat();
+const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'always' });
+function syncAge(seconds: number): string {
+  const age = Math.max(0, seconds);
+  if (age < 60) return relativeTime.format(-Math.floor(age), 'second');
+  if (age < 3600) return relativeTime.format(-Math.floor(age / 60), 'minute');
+  if (age < 86400) return relativeTime.format(-Math.floor(age / 3600), 'hour');
+  return relativeTime.format(-Math.floor(age / 86400), 'day');
+}
 const date = (value: string) => new Date(value).toLocaleString(undefined, {
   month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
 });
@@ -91,7 +99,7 @@ new ResizeObserver(drawChart).observe(element('traffic'));
 function renderStatus(status: Status): void {
   const healthy = status.synchronized && status.listening && status.tracking_healthy;
   element('sync-strip').className = `sync-strip ${healthy ? 'healthy' : 'pending'}`;
-  text('sync-label', healthy ? 'Synchronized' : !status.listening ? 'Listener offline'
+  text('sync-label', healthy ? `Synchronized${status.sync_age_seconds == null ? '' : ` ${syncAge(status.sync_age_seconds)}`}` : !status.listening ? 'Listener offline'
     : !status.tracking_healthy ? 'Tracking degraded' : 'Not synchronized');
   text('sync-detail', healthy ? `Following ${status.selected_upstream} / UDP ${status.port}`
     : status.synchronized ? 'Check server health' : 'Waiting for a valid upstream time sample');

@@ -13,6 +13,9 @@ test('simple console tracks real clients and recovers', async ({ page }, testInf
   await expect(page.getByRole('button', { name: 'Export clients as JSON' })).toHaveCount(0);
   await expect(page.getByText('Runtime configuration', { exact: true })).toHaveCount(0);
   await expect(page.locator('#sync-label')).toHaveText('Not synchronized');
+  await expect(page.getByRole('heading', { name: 'Overview' })).toHaveCount(0);
+  expect(await page.locator('.upstreams').evaluate(element =>
+    Boolean(element.compareDocumentPosition(document.querySelector('.clients-section')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
 
   await new Promise<void>((resolve, reject) => {
     const socket = createSocket('udp4');
@@ -53,4 +56,35 @@ test('simple console tracks real clients and recovers', async ({ page }, testInf
   expect(pixels).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('dashboard.png'), fullPage: true });
   expect(failures).toEqual([]);
+});
+
+test('synchronized status shows the last sync age', async ({ page }, testInfo) => {
+  let syncAge: number | null = 120;
+  let listening = true;
+  let trackingHealthy = true;
+  await page.route('**/api/status', async route => {
+    const response = await route.fetch();
+    await route.fulfill({ json: { ...await response.json(), synchronized: true,
+      listening, tracking_healthy: trackingHealthy, sync_age_seconds: syncAge,
+      selected_upstream: 'time.example.com' } });
+  });
+  await page.goto('/');
+  await expect(page.locator('#sync-label')).toHaveText('Synchronized 2 minutes ago');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath('synchronized.png'), fullPage: true });
+  for (const [age, label] of [
+    [0, '0 seconds ago'], [1, '1 second ago'], [59, '59 seconds ago'],
+    [60, '1 minute ago'], [3600, '1 hour ago'], [86400, '1 day ago'], [null, ''],
+  ] as const) {
+    syncAge = age;
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await expect(page.locator('#sync-label')).toHaveText(`Synchronized${label ? ` ${label}` : ''}`);
+  }
+  listening = false;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.locator('#sync-label')).toHaveText('Listener offline');
+  listening = true;
+  trackingHealthy = false;
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+  await expect(page.locator('#sync-label')).toHaveText('Tracking degraded');
 });

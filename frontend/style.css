@@ -25,8 +25,6 @@ svg { width: 18px; height: 18px; stroke-width: 1.7; flex-shrink: 0; }
 .local-time { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 21px; font-variant-numeric: tabular-nums; }
 .local-label { font-size: 10px; color: var(--muted); width: 35px; }
 main { max-width: 1320px; margin: auto; padding: 36px 32px 0; }
-.page-title { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
-h1 { font-size: 30px; font-weight: 550; margin: 0; }
 h2 { font-size: 21px; font-weight: 550; margin: 0; }
 .heading-inline, .pagination { display: flex; align-items: center; gap: 12px; }
 .icon-button { height: 42px; width: 42px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 5px; flex-shrink: 0; }
@@ -90,7 +88,6 @@ footer { display: flex; justify-content: space-between; gap: 12px; border-top: 1
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
 @media (max-width: 760px) {
   .header { height: 72px; padding: 0 20px; } main { padding: 25px 20px 0; }
-  h1 { font-size: 27px; }
   .stats { grid-template-columns: 1fr 1fr; gap: 12px; }
   .stats article { padding: 20px 16px; } .stats strong { font-size: 32px; margin-top: 18px; }
   .stat-label { font-size: 13px; } .stat-label svg { width: 16px; height: 16px; }
