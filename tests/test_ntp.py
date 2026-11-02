@@ -76,13 +76,14 @@ def test_unsynced_synced_and_stale_replies(tmp_path):
     server.repository.close()
 
 
-def test_acl_malformed_rate_limits_and_tracking(tmp_path, caplog):
+@pytest.mark.parametrize("invalid_version", [0, 5, 6, 7])
+def test_acl_malformed_rate_limits_and_tracking(tmp_path, caplog, invalid_version):
     caplog.set_level(logging.INFO, logger="kuro.ntp")
     server = service(tmp_path, rate_limit=1)
     packet = request_packet()
     assert server.response(b"bad", "127.0.0.1", time.time()) is None
     assert server.response(packet, "8.8.8.8", time.time()) is None
-    assert server.response(request_packet(2), "127.0.0.1", time.time()) is None
+    assert server.response(request_packet(invalid_version), "127.0.0.1", time.time()) is None
     assert server.response(packet, "127.0.0.1", time.time())
     assert server.response(packet, "127.0.0.1", time.time()) is None
     server.flush()
@@ -94,7 +95,7 @@ def test_acl_malformed_rate_limits_and_tracking(tmp_path, caplog):
     server.repository.close()
 
 
-@pytest.mark.parametrize("version", [3, 4])
+@pytest.mark.parametrize("version", [1, 2, 3, 4])
 @pytest.mark.parametrize("state", ["unsynced", "synced", "stale"])
 def test_zero_transmit_timestamp_request(tmp_path, version, state):
     server = service(tmp_path, sync_max_age=1)
@@ -123,7 +124,7 @@ def test_zero_transmit_timestamp_request(tmp_path, version, state):
         server.repository.close()
 
 
-@pytest.mark.parametrize("version", [3, 4])
+@pytest.mark.parametrize("version", [1, 2, 3, 4])
 @pytest.mark.parametrize("zero_timestamp", [False, True])
 def test_real_udp_exchange_and_upstream_client(tmp_path, monkeypatch, caplog,
                                               version, zero_timestamp):
