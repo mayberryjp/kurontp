@@ -170,7 +170,7 @@ class NTPService:
             return None
         packet = ntplib.NTPPacket()
         packet.from_data(data)
-        if packet.mode != 3 or packet.version not in (3, 4) or packet.tx_timestamp == 0:
+        if packet.mode != 3 or packet.version not in (3, 4):
             log.info("ntp_rejected ip=%s reason=invalid_packet mode=%s version=%s",
                      ip, packet.mode, packet.version)
             self.metrics["rejected"] += 1

@@ -94,7 +94,39 @@ def test_acl_malformed_rate_limits_and_tracking(tmp_path, caplog):
     server.repository.close()
 
 
-def test_real_udp_exchange_and_upstream_client(tmp_path, monkeypatch, caplog):
+@pytest.mark.parametrize("version", [3, 4])
+@pytest.mark.parametrize("state", ["unsynced", "synced", "stale"])
+def test_zero_transmit_timestamp_request(tmp_path, version, state):
+    server = service(tmp_path, sync_max_age=1)
+    if state == "synced":
+        server.sample = sample()
+    elif state == "stale":
+        server.sample = ClockSample(**{**vars(sample()), "monotonic": time.monotonic() - 2})
+    packet = bytes([(version << 3) | 3]) + bytes(47)
+    received = server.now()
+    try:
+        payload = server.response(packet, "10.1.30.100", received)
+        assert payload is not None
+        assert len(payload) == 48
+        assert payload[24:32] == bytes(8)
+        reply = ntplib.NTPPacket()
+        reply.from_data(payload)
+        assert (reply.version, reply.mode) == (version, 4)
+        assert (reply.leap, reply.stratum) == ((0, 3) if state == "synced" else (3, 16))
+        assert abs(reply.recv_timestamp - ntplib.system_to_ntp_time(received)) < 0.000001
+        assert reply.tx_timestamp > 0
+        assert server.metrics["rejected"] == 0
+        server.flush()
+        assert server.repository.summary()["requests"] == 1
+    finally:
+        server.close()
+        server.repository.close()
+
+
+@pytest.mark.parametrize("version", [3, 4])
+@pytest.mark.parametrize("zero_timestamp", [False, True])
+def test_real_udp_exchange_and_upstream_client(tmp_path, monkeypatch, caplog,
+                                              version, zero_timestamp):
     caplog.set_level(logging.INFO, logger="kuro.ntp")
     server = service(tmp_path)
     server.sample = sample()
@@ -107,9 +139,15 @@ def test_real_udp_exchange_and_upstream_client(tmp_path, monkeypatch, caplog):
         assert address == "127.0.0.1"
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as connection:
             connection.settimeout(1)
-            connection.sendto(request_packet(3), ("127.0.0.1", port))
+            packet = (bytes([(version << 3) | 3]) + bytes(47)
+                      if zero_timestamp else request_packet(version))
+            connection.sendto(packet, ("127.0.0.1", port))
             payload, _ = connection.recvfrom(512)
             assert len(payload) == 48
+            assert payload[24:32] == packet[40:48]
+            reply = ntplib.NTPPacket()
+            reply.from_data(payload)
+            assert (reply.version, reply.mode, reply.stratum) == (version, 4, 3)
     finally:
         server.close()
     assert server.repository.summary()["requests"] == 2

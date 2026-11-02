@@ -73,6 +73,8 @@ is required; host networking needs the service configured to listen on UDP 123.
 ## Time and Tracking Behavior
 
 - Supports basic 48-byte NTPv3/v4 client requests, not control/monitor commands.
+  Accepts zero transmit timestamps for compatibility with simple devices; replies
+  echo the client's timestamp unchanged in the origin field.
 - Uses `ntplib` packet parsing with connected UDP sockets and explicit origin,
   mode, version, stratum, timestamp, delay, and dispersion checks on upstream replies.
 - Polls configured upstreams sequentially and selects the valid sample with the
